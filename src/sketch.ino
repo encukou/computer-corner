@@ -1,5 +1,6 @@
 #include <Adafruit_NeoPixel.h>
 
+#define PIEZO_PIN 11
 #define LED_PIN 12
 
 #define CLOCK_FACE_SIZE 21
@@ -85,6 +86,20 @@ void loop() {
                 if (lastEpochTime) {
                     drift = float(epochTime - lastEpochTime) /
                             float(epochMillis - lastEpochMillis);
+                }
+            } break;
+            case 'b': {
+                // Set buzzer. args:
+                // frequency in Hz, or 0 to stop (16-bit unsigned int)
+                // Note that the LED driver interferes with the tone,
+                // so expect screeches and not music
+                uint16_t frequency;
+                frequency = uint16_t(read()) << uint16_t(8);
+                frequency |= uint16_t(read());
+                if (frequency) {
+                    tone(PIEZO_PIN, frequency);
+                } else {
+                    noTone(PIEZO_PIN);
                 }
             } break;
         }
