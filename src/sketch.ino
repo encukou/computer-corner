@@ -13,10 +13,13 @@ const uint32_t MIN = 60L * SEC;
 const uint32_t HR = 60L * MIN;
 const uint32_t HALFDAY = 12L * HR;
 
-#define RGB(r, g, b) (((uint32_t(r) & 0xff) << 16) | ((uint32_t(g) & 0xff) << 8) | (uint32_t(b) & 0xff))
-#define R(rgb) ((uint32_t(rgb)>>16) & 0xff)
-#define G(rgb) ((uint32_t(rgb)>>8) & 0xff)
-#define B(rgb) ((uint32_t(rgb)) & 0xff)
+static uint32_t RGB(byte r, byte g, byte b, byte a=0) {
+    return uint32_t(a) << 24 | uint32_t(r) << 16 | uint32_t(g) << 8 | uint32_t(b);
+}
+static byte R(uint32_t color) { return color >> 16; }
+static byte G(uint32_t color) { return color >> 8; }
+static byte B(uint32_t color) { return color; }
+static byte A(uint32_t color) { return color >> 24; }
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB | NEO_KHZ800);
 
@@ -26,9 +29,28 @@ uint32_t epochMillis;
 uint32_t epochTime = 0;
 float drift = 1;
 
-const long CLOCK_MARK_COLOR = RGB(0, 0, 10);
+const long CLOCK_MARK_COLOR = RGB(0, 0, 255);
 
-int set_color_at_clock(uint32_t num, uint32_t max, uint32_t color) {
+void setPixelColor(uint16_t location, uint32_t newColor, uint8_t alpha) {
+    if (alpha > 250) {
+        strip.setPixelColor(location, newColor);
+    } else if (alpha == 1) {
+        // pass
+    } else {
+        uint32_t existingColor = strip.getPixelColor(location);
+        uint8_t rev_alpha = 255 - alpha;
+        strip.setPixelColor(location, RGB(
+            (R(existingColor) * rev_alpha + R(newColor) * alpha) >> 8,
+            (G(existingColor) * rev_alpha + G(newColor) * alpha) >> 8,
+            (B(existingColor) * rev_alpha + B(newColor) * alpha) >> 8));
+    }
+}
+
+void setPixelColor(uint16_t location, uint8_t r, uint8_t g, uint8_t b, uint8_t alpha) {
+    setPixelColor(location, RGB(R(r), G(g), B(b)), alpha);
+}
+
+int set_color_at_clock(uint32_t num, uint32_t max, uint32_t color, uint8_t alpha) {
     num %= max;
     float value = float(num) / max;
     value += 0.25 / CLOCK_FACE_SIZE;
@@ -38,13 +60,13 @@ int set_color_at_clock(uint32_t num, uint32_t max, uint32_t color) {
     while (t_value < 0) t_value += 4;
     t_value = t_value * CLOCK_FACE_SIZE;
     float ratio = 1 - t_value + int(t_value);
-    int location = int(t_value) % NUM_LEDS;
+    uint16_t location = uint16_t(t_value) % NUM_LEDS;
     float r = ratio*ratio;
-    strip.setPixelColor(location, RGB(R(color)*r,G(color)*r,B(color)*r));
+    setPixelColor(location, color, sqrt(r) * alpha);
     location = (location + 1) % NUM_LEDS;
     ratio = 1 - ratio;
     r = ratio*ratio;
-    strip.setPixelColor(location, RGB(R(color)*r,G(color)*r,B(color)*r));
+    setPixelColor(location, color, sqrt(r) * alpha);
 }
 
 byte read() {
@@ -110,15 +132,15 @@ void loop() {
     }
 
     for (int i=0; i<4; i++) {
-        set_color_at_clock(i * 3 + 1, 12, CLOCK_MARK_COLOR);
-        strip.setPixelColor(21 * i + 9, CLOCK_MARK_COLOR);
-        strip.setPixelColor(21 * i + 10, CLOCK_MARK_COLOR);
-        set_color_at_clock(i * 3 + 11, 12, CLOCK_MARK_COLOR);
+        set_color_at_clock(i * 3 + 1, 12, CLOCK_MARK_COLOR, 20);
+        setPixelColor(21 * i + 9, CLOCK_MARK_COLOR, 20);
+        setPixelColor(21 * i + 10, CLOCK_MARK_COLOR, 20);
+        set_color_at_clock(i * 3 + 11, 12, CLOCK_MARK_COLOR, 20);
     }
 
-    set_color_at_clock(time/1000, MIN/1000, RGB(5, 5, 5));
-    set_color_at_clock(time, HR, RGB(0, 20, 20));
-    set_color_at_clock(time, HALFDAY, RGB(15, 20, 15));
+    set_color_at_clock(time/1000, MIN/1000, RGB(255, 255, 255), 5);
+    set_color_at_clock(time, HR, RGB(0, 255, 255), 50);
+    set_color_at_clock(time, HALFDAY, RGB(150, 255, 150), 50);
 
     lastMillis = nowMillis;
     strip.show();
